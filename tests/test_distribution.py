@@ -141,7 +141,7 @@ class RoutingTests(unittest.TestCase):
 class InstallTests(unittest.TestCase):
     def test_install_repeat_and_preserve_unrelated(self):
         with tempfile.TemporaryDirectory(prefix="skill test 中文 ") as root:
-            parent = Path(root)
+            parent = Path(root).resolve()
             unrelated = parent / "other-skill.txt"
             unrelated.write_text("keep")
             self.assertEqual(installer.install(parent)["status"], "installed")
@@ -152,11 +152,12 @@ class InstallTests(unittest.TestCase):
 
     def test_modified_install_not_overwritten(self):
         with tempfile.TemporaryDirectory() as root:
-            installer.install(root)
-            target = Path(root) / installer.NAME / "SKILL.md"
+            parent = Path(root).resolve()
+            installer.install(parent)
+            target = parent / installer.NAME / "SKILL.md"
             target.write_text("personal changes")
             with self.assertRaises(ValueError):
-                installer.install(root)
+                installer.install(parent)
             self.assertEqual(target.read_text(), "personal changes")
 
     def test_source_overlap_rejected(self):
@@ -165,7 +166,7 @@ class InstallTests(unittest.TestCase):
 
     def test_symlink_rejected_when_supported(self):
         with tempfile.TemporaryDirectory() as root:
-            path = Path(root)
+            path = Path(root).resolve()
             original, link = path / "original", path / "link"
             original.mkdir()
             try:
@@ -174,6 +175,29 @@ class InstallTests(unittest.TestCase):
                 self.skipTest("OS does not allow creating test symlinks")
             with self.assertRaises(ValueError):
                 installer.install(link)
+
+    def test_cli_default_code_home_install_and_repeat(self):
+        with tempfile.TemporaryDirectory() as root:
+            parent = Path(root).resolve()
+            unrelated = parent / "unrelated.txt"
+            unrelated.write_text("keep", encoding="utf-8")
+            cmd = [sys.executable, str(ROOT / "install.py")]
+            env = {**os.environ, "CODEX_HOME": str(parent)}
+
+            first = subprocess.run(cmd, cwd=ROOT, env=env, capture_output=True, text=True)
+            self.assertEqual(first.returncode, 0, first.stderr)
+            self.assertEqual(json.loads(first.stdout)["status"], "installed")
+
+            second = subprocess.run(cmd, cwd=ROOT, env=env, capture_output=True, text=True)
+            self.assertEqual(second.returncode, 0, second.stderr)
+            self.assertEqual(json.loads(second.stdout)["status"], "already_installed")
+
+            target = parent / "skills" / installer.NAME
+            self.assertEqual(
+                {p.relative_to(target).as_posix() for p in target.rglob("*") if p.is_file()},
+                set(installer.FILES),
+            )
+            self.assertEqual(unrelated.read_text(encoding="utf-8"), "keep")
 
 
 if __name__ == "__main__":
