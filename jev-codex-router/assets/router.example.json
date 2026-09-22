@@ -1,0 +1,6 @@
+{
+  "provider": "openrouter",
+  "min_confidence": 0.65,
+  "timeout_seconds": 30,
+  "routes": {}
+}

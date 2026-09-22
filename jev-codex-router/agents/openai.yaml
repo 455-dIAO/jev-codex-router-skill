@@ -1,0 +1,4 @@
+interface:
+  display_name: "Jev Codex 模型路由"
+  short_description: "通过 Jev 为 Codex 子任务选择模型和推理强度，并提供原项目接入指引"
+  default_prompt: "使用 $jev-codex-router 检查当前宿主的可用模型，为适合独立执行的子任务配置并验证 Jev 路由。"
