@@ -7,6 +7,7 @@
 按任务需求选择 **模型 × 推理强度**，把路由流程装进一个可分享的 Codex Skill。
 
 [![Release](https://img.shields.io/github/v/release/455-dIAO/jev-codex-router-skill?style=flat-square&color=0f766e)](https://github.com/455-dIAO/jev-codex-router-skill/releases/latest)
+[![Platform validation](https://github.com/455-dIAO/jev-codex-router-skill/actions/workflows/platform-validation.yml/badge.svg)](https://github.com/455-dIAO/jev-codex-router-skill/actions/workflows/platform-validation.yml)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Dependencies](https://img.shields.io/badge/运行依赖-Python_标准库-475569?style=flat-square)
 ![Providers](https://img.shields.io/badge/Jev-TypeSafe_%7C_OpenRouter-7c3aed?style=flat-square)
@@ -117,23 +118,25 @@ Jev 负责选择，Codex 负责执行。路由脚本返回结构化参数，不�
 | **使用指南** | [配置与验证](jev-codex-router/references/configuration.md) | [上游接入指南](jev-codex-router/references/upstream-macos.md) |
 
 > [!NOTE]
-> 没有显式选模接口时，结果只能作为建议。Windows 已完成本包的安装与选模测试；macOS / Linux 实机运行、桌面子智能体实际执行模型等验证边界见下方记录。
+> 没有显式选模接口时，结果只能作为建议。本包已完成 Windows 桌面子任务实际模型核验，以及 Ubuntu / macOS 的安装与离线路由测试。macOS 上游 CLI 的登录和逐轮路由是另一条链路，仍需另行验证。
 
 ## 🔎 验证状态
 
-以下为 **v1.0.0 于 2026-09-22 的交付验证**，不是持续集成实时状态。
+以下为 **2026-09-22 的验证快照**。v1.0.1 补充跨平台测试和验证记录，安装器与路由脚本保持 v1.0.0 的实现；顶部 Platform validation 徽章显示最新工作流状态。
 
 | 检查项 | 结果 |
 | :--- | :--- |
 | Skill 格式校验 | ✅ 通过 |
-| 离线回归测试 | ✅ 15 项通过；1 项因 Windows 链接创建权限跳过 |
+| Windows 离线回归测试 | ✅ 16 项通过；1 项因链接创建权限跳过 |
 | ZIP 解压后首次安装与重复安装 | ✅ 通过 |
 | OpenRouter 实时选模 | ✅ 一次合成任务成功，置信度 1.0 |
-| 桌面子任务实际执行模型 | ⏳ 未验证；选模成功不等于已执行 |
-| TypeSafe 账户直连、macOS / Linux 实机运行 | ⏳ 未验证 |
-| 独立子智能体审查 | ⏸ Jev 低置信度，未派发 |
+| 桌面子任务实际执行模型 | ✅ 本包选模 → 原生派发 → 完成；执行记录确认 `gpt-5.6-luna / low` |
+| TypeSafe 官方账户直连 | ✅ 使用本机账户环境凭据，真实调用成功，置信度 1.0 |
+| Ubuntu / macOS 系统运行 | ✅ GitHub 托管系统，Python 3.10 / 3.12 四组各 17 项通过；另有 Ubuntu WSL 验证 |
+| 上游 macOS CLI 登录与逐轮路由 | ⏳ 未验证；跨平台离线测试不包含这条链路 |
+| v1.0.0 完整 Skill 独立审查 | ⏸ 当时因 Jev 低置信度未派发；本轮验证不替代完整审查 |
 
-[查看完整验证记录 →](VALIDATION.md)
+[查看完整验证记录 →](VALIDATION.md) · [查看 macOS / Linux 测试运行 →](https://github.com/455-dIAO/jev-codex-router-skill/actions/runs/35697914357)
 
 <details>
 <summary><strong>自己运行离线测试或核对下载文件</strong></summary>
@@ -147,7 +150,7 @@ python -m unittest discover -s tests -v
 Release 附带 `.zip.sha256` 文件。Windows PowerShell 可运行下面的命令，将结果与校验文件中的值比较：
 
 ```powershell
-Get-FileHash .\jev-codex-router-skill-v1.0.0.zip -Algorithm SHA256
+Get-FileHash .\jev-codex-router-skill-v1.0.1.zip -Algorithm SHA256
 ```
 
 </details>
