@@ -1,0 +1,37 @@
+name: Platform validation
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - install.py
+      - jev-codex-router/**
+      - tests/**
+      - .github/workflows/platform-validation.yml
+
+permissions:
+  contents: read
+
+jobs:
+  offline-tests:
+    name: ${{ matrix.os }} / Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15-intel]
+        python: ['3.10', '3.12']
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Record actual runtime
+        run: python -c "import platform, sys; print(platform.platform()); print(platform.machine()); print(sys.version)"
+      - name: Run offline installer and routing tests
+        run: python -m unittest discover -s tests -v
