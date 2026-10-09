@@ -5,6 +5,8 @@
 - 每次选择前从 Codex app-server 分页读取 `model/list`，根据模型和支持的推理强度自动生成候选。保留旧版非空手工 `routes`。
 - Windows 实际 Codex 目录：7 个模型、40 个模型/档位组合，包含 `gpt-6.1-sol`、`gpt-6-astra`、`gpt-6-sol`、`gpt-6-luna` 及三款 `gpt-5.6` 模型。目录可能由 Codex 缓存提供，不是账户推理权限证明。
 - Windows 正常用户权限回归：27 项中 26 项通过，1 项因符号链接创建权限跳过。覆盖真实交互形态的 RPC 握手、分页、目录刷新后新增模型、过滤、循环游标、初始化错误、超时、退出、无换行超长响应、通知流量和 npm 包原生程序解析。
+- [GitHub Ubuntu / macOS、Python 3.10 / 3.12 四组验证](https://github.com/455-dIAO/jev-codex-router-skill/actions/runs/37892752732)全部通过，每组 27 项。首轮 macOS 的临时路径别名断言失败已通过解析测试目录真实路径修复，未放宽安装器路径检查。
+- 最终 ZIP 首次安装、相同内容重复安装、9 文件清单与自动配置的离线校验通过；已安装 Skill 与分发源码逐字节一致。
 - 沙箱中的安装测试遇到临时目录权限错误；正常用户权限复测通过。没有将沙箱失败计为通过。
 - Skill 格式检查通过。独立审查发现 Windows npm 包装器解析与响应长度限制问题，修复并复审通过。
 - OpenRouter Decisions 实时调用成功到达提供方，`provider_live=true`。完整公开示例在自动发现的 40 个候选中倾向 `gpt-6-luna / low`，置信度 0.48，低于保留的 0.65 阈值，返回 `deferred`，未派发。此结果不声称新的子智能体执行成功。
