@@ -42,6 +42,48 @@ def answer(choice="fast", confidence=0.9):
 
 
 class RoutingTests(unittest.TestCase):
+    def test_automatic_catalog_refreshed_and_audited(self):
+        auto = {"provider": "typesafe", "model_source": "codex"}
+        with tempfile.TemporaryDirectory() as root, patch.object(router, "discover_routes") as discover:
+            discover.side_effect = [config()["routes"], {
+                **config()["routes"], "new": {"model": "fixture-new", "reasoning_effort": "high", "description": "New capability"}}]
+            first = router.execute(auto, TASK, root, provider=lambda c, t: answer())
+            second = router.execute(auto, TASK, root, provider=lambda c, t: {
+                "answers": {"route": {"type": "choice", "choice": "new", "confidence": 1,
+                    "probabilities": {"fast": 0, "deep": 0, "new": 1, "defer": 0}}}})
+            self.assertEqual(discover.call_count, 2)
+            self.assertEqual(first["status"], "selected")
+            self.assertEqual(second["selected_model"], "fixture-new")
+            self.assertNotEqual(first["resolved_routes_sha256"], second["resolved_routes_sha256"])
+            self.assertEqual(second["model_count"], 3)
+            self.assertEqual(second["model_catalog_source"], "codex_app_server")
+            self.assertFalse(second["catalog_access_verified"])
+            self.assertNotIn("routes", auto)
+
+    def test_discovery_failure_or_sole_option_never_calls_provider(self):
+        for discovered in (router.CatalogError("Catalog unavailable"), {"fast": config()["routes"]["fast"]}, {}):
+            with tempfile.TemporaryDirectory() as root, patch.object(router, "discover_routes") as discover, patch.object(router, "call_provider") as provider:
+                if isinstance(discovered, Exception):
+                    discover.side_effect = discovered
+                else:
+                    discover.return_value = discovered
+                result = router.execute({"provider": "typesafe"}, TASK, root, provider=provider)
+                self.assertEqual(result["status"], "error")
+                self.assertNotIn("spawn_arguments", result)
+                provider.assert_not_called()
+
+    def test_auto_offline_validation_and_ambiguous_config(self):
+        with patch.object(router, "discover_routes") as discover:
+            router.validate({"provider": "typesafe"}, TASK)
+            router.validate({"provider": "typesafe", "routes": {}}, TASK)
+            discover.assert_not_called()
+        for changes in ({"model_source": "unknown"}, {"model_source": "codex"},
+                        {"routes": None}, {"discovery_timeout_seconds": True},
+                        {"allowed_models": []}, {"allowed_efforts": ["invented"]},
+                        {"codex_command": "shell string"}):
+            with self.assertRaises(router.RouteError):
+                router.validate({**config(), **changes}, TASK)
+
     def test_selected_keeps_original_task(self):
         task = copy.deepcopy(TASK)
         result = router.interpret(answer(), config(), task)
@@ -69,7 +111,7 @@ class RoutingTests(unittest.TestCase):
                 router.interpret(response, config(), TASK)
 
     def test_bad_config_and_full_history_fail(self):
-        for change in ({"routes": {}}, {"min_confidence": float("inf")}, {"timeout_seconds": True}, {"provider": "other"}):
+        for change in ({"routes": {}, "model_source": "manual"}, {"min_confidence": float("inf")}, {"timeout_seconds": True}, {"provider": "other"}):
             with self.subTest(change=change), self.assertRaises(router.RouteError):
                 router.validate({**config(), **change}, TASK)
         for task in ({**TASK, "fork_turns": "all"}, {**TASK, "model": "forced"}, {**TASK, "agent_type": "fixed_role"}):

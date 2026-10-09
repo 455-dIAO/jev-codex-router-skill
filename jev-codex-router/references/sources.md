@@ -10,5 +10,6 @@
 - [TypeSafe 官方 API 契约](https://docs.typesafe.ai/api)：`state`、`questions`、`choice`、概率分布和置信度。
 - [OpenRouter 官方 OpenAPI](https://openrouter.ai/openapi.json)：查找 `/api/alpha/decisions`。
 - [OpenRouter TypeSafe 模型页](https://openrouter.ai/typesafe)：Jev 模型与别名。模型页的通用聊天示例不能代替 Decisions 接口契约。
+- [Codex App Server](https://learn.chatgpt.com/docs/app-server)：2026-10-09 核对 `initialize`、`initialized`、`model/list`、分页与 `supportedReasoningEfforts`，用于自动模型发现。
 
 `main`、最新模型别名和 alpha API 会变化。实际安装应记录上游提交；每个接收者应重新发现自己宿主的模型候选。本包的源码检查、离线测试和某一个账户的实时测试都不证明其他账户拥有权限或同样模型。

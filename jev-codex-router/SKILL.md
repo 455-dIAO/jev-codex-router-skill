@@ -15,7 +15,7 @@ Jev chooses a supported model/effort pair; Codex executes the work. Preserve exp
 
 ## Portable selector workflow
 
-1. Discover model IDs, supported reasoning efforts and capability descriptions from the current host tool schema or live Codex model catalog. Build a JSON config following [references/configuration.md](references/configuration.md). Never reuse another user's catalog as proof of availability. Filter choices using explicit user constraints before asking Jev. An empty choice set is a configuration problem; a sole permitted choice does not need Jev.
+1. Use `assets/router.example.json` with `model_source: codex`. The selector starts the installed Codex app-server and reads `model/list` on every routing invocation, including pagination, supported reasoning efforts and descriptions. New models require no manual config updates. No router catalog cache is reused on failure. Codex itself may serve a bundled/cached catalog; this is not an entitlement check. Confirm the selected pair is allowed by the current host spawn schema, since a separate CLI can differ from Desktop. Apply optional `allowed_models` / `allowed_efforts` for explicit user constraints. Never ask the user to maintain model names for ordinary automatic use. An empty choice set is an error; a sole permitted choice needs no Jev. See [references/configuration.md](references/configuration.md).
 2. Write a small UTF-8 task JSON containing `task_name`, `agent_type`, `fork_turns`, and `message`. `fork_turns` must be `none` or a positive integer string; a full-history fork cannot override the model in hosts with that restriction. Describe the goal, scope, dependencies, risks, acceptance checks and file ownership in `message`. For workers, state that other agents may be editing, do not revert their work, and prohibit nested delegation unless separately authorized.
 3. Tell the user that the task summary and candidate descriptions go to the chosen Jev provider. Send only the necessary authorized task summary, never credentials or whole private files. Provider credentials come only from the executing process environment. Use `OPENROUTER_API_KEY` for OpenRouter, or `JEV_API_KEY` / `TYPESAFE_API_KEY` for TypeSafe. Do not put keys in task/config files, command arguments or tool output.
 4. Resolve the script relative to this Skill's actual location. Run a local validation first:
@@ -24,7 +24,13 @@ Jev chooses a supported model/effort pair; Codex executes the work. Preserve exp
    python <skill-dir>/scripts/route.py --config <config.json> --input <task.json> --check
    ```
 
-   This makes no provider call and is not live proof. For live selection, use an authorized writable audit directory:
+   This is offline config/task validation; it does not check Codex availability. Inspect automatic candidates without calling Jev:
+
+   ```text
+   python <skill-dir>/scripts/route.py --config <config.json> --list-models
+   ```
+
+   For live selection, which discovers candidates again, use an authorized writable audit directory:
 
    ```text
    python <skill-dir>/scripts/route.py --config <config.json> --input <task.json> --audit-dir <audit-dir>

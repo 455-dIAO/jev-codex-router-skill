@@ -14,6 +14,9 @@ from datetime import datetime, timezone
 from urllib.error import HTTPError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from catalog import CatalogError, discover_routes
+
 LIMIT = 131072
 PROVIDERS = {
     "typesafe": ("https://api.typesafe.ai/v1/systemone", "jev-latest", ("JEV_API_KEY", "TYPESAFE_API_KEY")),
@@ -43,7 +46,11 @@ def number(value, low, high):
     return type(value) in (int, float) and math.isfinite(value) and low <= value <= high
 
 
-def validate(config, task):
+def automatic(config):
+    return config.get("model_source", "codex" if not config.get("routes") else "manual") == "codex"
+
+
+def validate(config, task, *, resolved=False):
     if not isinstance(config, dict) or config.get("provider") not in PROVIDERS:
         raise RouteError("Choose provider: typesafe or openrouter")
     if not number(config.get("min_confidence", 0.65), 0, 1):
@@ -53,10 +60,27 @@ def validate(config, task):
     model = config.get("jev_model", PROVIDERS[config["provider"]][1])
     if not isinstance(model, str) or not model or len(model) > 160:
         raise RouteError("Invalid Jev provider model")
-    routes = config.get("routes")
-    if not isinstance(routes, dict) or not 2 <= len(routes) <= 254:
+    if config.get("model_source", "codex") not in ("codex", "manual"):
+        raise RouteError("model_source must be codex or manual")
+    if "routes" in config and not isinstance(config["routes"], dict):
+        raise RouteError("routes must be an object")
+    if config.get("model_source") == "codex" and config.get("routes") and not resolved:
+        raise RouteError("Remove fixed routes when model_source=codex")
+    if not number(config.get("discovery_timeout_seconds", 20), 1, 60):
+        raise RouteError("discovery_timeout_seconds must be in [1, 60]")
+    for field in ("allowed_models", "allowed_efforts", "codex_command"):
+        value = config.get(field)
+        if value is not None and (not isinstance(value, list) or not value or
+                                  not all(isinstance(v, str) and v.strip() for v in value)):
+            raise RouteError(f"{field} must be a non-empty string array")
+    if "allowed_efforts" in config and not set(config["allowed_efforts"]) <= EFFORTS:
+        raise RouteError("allowed_efforts contains an unsupported effort")
+    routes = config.get("routes", {})
+    if automatic(config) and not resolved:
+        routes = None
+    if routes is not None and (not isinstance(routes, dict) or not 2 <= len(routes) <= 254):
         raise RouteError("Provide 2 to 254 verified routes; a sole option needs no Jev call")
-    for name, route in routes.items():
+    for name, route in (routes or {}).items():
         if not re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", name) or name == "defer":
             raise RouteError("Invalid route name or reserved name defer")
         if not isinstance(route, dict) or set(route) != {"model", "reasoning_effort", "description"}:
@@ -159,6 +183,15 @@ def save_audit(directory, result):
     return str(destination)
 
 
+def resolve_config(config, task):
+    validate(config, task)
+    resolved = dict(config)
+    if automatic(config):
+        resolved["routes"] = discover_routes(config)
+    validate(resolved, task, resolved=True)
+    return resolved
+
+
 def execute(config, task, audit_dir, provider=call_provider):
     result = {"decision_id": str(uuid.uuid4()), "decision_id_source": "local",
               "time_utc": datetime.now(timezone.utc).isoformat(), "status": "error",
@@ -176,13 +209,20 @@ def execute(config, task, audit_dir, provider=call_provider):
         with probe.open("x", encoding="utf-8"):
             pass
         probe.unlink()
+        source = "codex_app_server" if automatic(config) else "manual"
+        config = resolve_config(config, task)
+        result.update(model_catalog_source=source, route_count=len(config["routes"]),
+                      model_count=len({r["model"] for r in config["routes"].values()}),
+                      catalog_access_verified=False)
+        result["resolved_routes_sha256"] = hashlib.sha256(
+            json.dumps(config["routes"], sort_keys=True).encode()).hexdigest()
         response = provider(config, task)
         result["provider_live"] = provider is call_provider
         result.update(interpret(response, config, task))
         if isinstance(response, dict) and isinstance(response.get("id"), str) and re.fullmatch(r"[A-Za-z0-9_.:-]{1,200}", response["id"]):
             result["provider_decision_id"] = response["id"]
     except Exception as error:
-        result.update(status="error", error=str(error) if isinstance(error, RouteError) else f"Local error ({type(error).__name__})")
+        result.update(status="error", error=str(error) if isinstance(error, (RouteError, CatalogError)) else f"Local error ({type(error).__name__})")
         result.pop("spawn_arguments", None)
     try:
         result["audit_path"] = save_audit(Path(audit_dir), result)
@@ -197,24 +237,40 @@ def main():
         sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", required=True, type=Path)
-    parser.add_argument("--input", required=True, type=Path)
+    parser.add_argument("--input", type=Path)
     parser.add_argument("--audit-dir", type=Path)
     parser.add_argument("--check", action="store_true", help="Offline validation only")
+    parser.add_argument("--list-models", action="store_true", help="Discover current candidates without calling Jev")
     args = parser.parse_args()
     try:
-        config, task = load_json(args.config), load_json(args.input)
+        config = load_json(args.config)
+        if args.list_models and args.check:
+            raise RouteError("--list-models and --check cannot be combined")
+        if args.input is None and not args.list_models:
+            raise RouteError("--input is required unless using --list-models")
+        task = load_json(args.input) if args.input else {
+            "task_name": "catalog_check", "agent_type": "default", "fork_turns": "none",
+            "message": "Inspect the model catalog only; do not execute work."}
         validate(config, task)
-        if args.check:
-            result = {"status": "validated", "provider_live": False, "actual_model_verified": False}
+        if args.list_models:
+            resolved = resolve_config(config, task)
+            result = {"status": "catalog_ready", "provider_live": False, "actual_model_verified": False,
+                      "model_catalog_source": "codex_app_server" if automatic(config) else "manual",
+                      "catalog_access_verified": False, "routes": resolved["routes"],
+                      "model_count": len({r["model"] for r in resolved["routes"].values()}),
+                      "route_count": len(resolved["routes"])}
+        elif args.check:
+            result = {"status": "validated", "provider_live": False, "actual_model_verified": False,
+                      "catalog_checked": False}
         else:
             if args.audit_dir is None:
                 raise RouteError("--audit-dir is required for live selection")
             result = execute(config, task, args.audit_dir)
     except Exception as error:
         result = {"status": "error", "provider_live": False,
-                  "error": str(error) if isinstance(error, RouteError) else f"Input error ({type(error).__name__})"}
+                  "error": str(error) if isinstance(error, (RouteError, CatalogError)) else f"Input error ({type(error).__name__})"}
     print(json.dumps(result, ensure_ascii=False, allow_nan=False))
-    return 0 if result["status"] in ("selected", "validated") else 2
+    return 0 if result["status"] in ("selected", "validated", "catalog_ready") else 2
 
 
 if __name__ == "__main__":

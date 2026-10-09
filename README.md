@@ -89,7 +89,13 @@ python install.py --skills-dir /your/custom/skills
 并分别说明子任务是否执行、实际模型是否得到验证。
 ```
 
-Skill 会引导 Codex 生成适合你当前环境的配置，**不需要照搬其他人的模型名称**。
+默认开启自动模型发现：**每次路由前读取本机 Codex 的模型与推理档位，新模型无需手动配置**。需要已登录、支持 `app-server model/list` 的 Codex。旧配置升级时删除固定 `routes`，设置 `"model_source": "codex"`。
+
+```sh
+python jev-codex-router/scripts/route.py --config jev-codex-router/assets/router.example.json --list-models
+```
+
+此命令只查看候选，不调用 Jev。Codex 目录可能由客户端缓存提供，不能据此证明账户推理权限；桌面派发前仍核对宿主是否接受选定模型。
 
 <a id="how-it-works"></a>
 
@@ -122,7 +128,9 @@ Jev 负责选择，Codex 负责执行。路由脚本返回结构化参数，不�
 
 ## 🔎 验证状态
 
-以下为 **2026-09-22 的验证快照**。v1.0.1 补充跨平台测试和验证记录，安装器与路由脚本保持 v1.0.0 的实现；顶部 Platform validation 徽章显示最新工作流状态。
+**v1.1.0（2026-10-09）**：本机自动读取 7 个模型、40 个模型/档位组合；Windows 26 项测试通过、1 项链接权限用例跳过。真实 Jev 调用已验证，但本轮完整示例的置信度低于原有 0.65 阈值，按预期停止派发；没有将低置信度结果当作执行成功。详细记录见 [VALIDATION.md](VALIDATION.md)。顶部徽章显示最新跨平台工作流状态。
+
+以下表格保留 **2026-09-22 / v1.0.1 的历史验证快照**，不代表新版本重新完成了这些实际模型执行检查。
 
 | 检查项 | 结果 |
 | :--- | :--- |
@@ -150,7 +158,7 @@ python -m unittest discover -s tests -v
 Release 附带 `.zip.sha256` 文件。Windows PowerShell 可运行下面的命令，将结果与校验文件中的值比较：
 
 ```powershell
-Get-FileHash .\jev-codex-router-skill-v1.0.1.zip -Algorithm SHA256
+Get-FileHash .\jev-codex-router-skill-v1.1.0.zip -Algorithm SHA256
 ```
 
 </details>
@@ -178,7 +186,7 @@ Get-FileHash .\jev-codex-router-skill-v1.0.1.zip -Algorithm SHA256
 <details>
 <summary><strong>重复安装会覆盖我的配置吗？</strong></summary>
 
-安装器只复制八个必要文件，不联网、不读取 Key，不修改 Hooks、`AGENTS.md` 或已有模型配置。相同内容返回 `already_installed`；已有内容不同时停止覆盖。需要更新时，先备份旧 Skill 目录和个人改动。
+安装器只复制必要文件，不联网、不读取 Key，不修改 Hooks、`AGENTS.md` 或已有模型配置。相同内容返回 `already_installed`；已有内容不同时停止覆盖。需要更新时，先备份旧 Skill 目录和个人改动。
 
 </details>
 

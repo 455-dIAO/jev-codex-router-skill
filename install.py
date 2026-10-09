@@ -9,7 +9,7 @@ import tempfile
 
 NAME = "jev-codex-router"
 FILES = (
-    "SKILL.md", "agents/openai.yaml", "scripts/route.py",
+    "SKILL.md", "agents/openai.yaml", "scripts/route.py", "scripts/catalog.py",
     "references/configuration.md", "references/upstream-macos.md",
     "references/sources.md", "assets/task.example.json", "assets/router.example.json",
 )
