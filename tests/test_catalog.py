@@ -91,6 +91,7 @@ class CatalogTests(unittest.TestCase):
 
     def test_windows_npm_wrapper_resolves_native_without_shell(self):
         with tempfile.TemporaryDirectory() as root, patch.object(catalog.platform, "machine", return_value="AMD64"):
+            root = Path(root).resolve()
             wrapper = Path(root) / "codex.cmd"
             wrapper.write_text("must never execute shell")
             binary = Path(root) / "node_modules/@openai/codex/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe"
